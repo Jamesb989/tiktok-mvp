@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
+  // You can log it or ignore it explicitly
+  void req
+
   const url = new URL('https://www.tiktok.com/v2/auth/authorize')
 
   url.searchParams.set('client_key', process.env.TIKTOK_CLIENT_KEY!)
