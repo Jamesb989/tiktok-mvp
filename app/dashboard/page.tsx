@@ -1,8 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 
+type Creator = {
+  id: string
+  nickname: string
+  follower_count: number
+}
+
 export default function Dashboard() {
-  const [creators, setCreators] = useState<any[]>([])
+  const [creators, setCreators] = useState<Creator[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,3 +42,4 @@ export default function Dashboard() {
     </main>
   )
 }
+
