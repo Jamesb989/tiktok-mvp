@@ -1,45 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server'
-import axios from 'axios'
+// app/api/creators/route.ts
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
-  console.log('📨 Incoming invite POST request...')
+export async function GET(req: NextRequest) {
+  // CORRECTED: Get the cookie directly from the request object.
+  const tokenCookie = req.cookies.get('access_token');
 
-  const access_token = req.cookies.get('access_token')?.value
-  if (!access_token) {
-    console.warn('⚠️ No access token found. Redirecting to /login')
-    return NextResponse.redirect('/login')
+  if (!tokenCookie) {
+    return NextResponse.json({ error: 'Authentication token not found.' }, { status: 401 });
   }
 
-  try {
-    const formData = await req.formData()
-    const creator_id = formData.get('creator_id') as string
+  const accessToken = tokenCookie.value;
 
-    if (!creator_id) {
-      console.warn('⚠️ No creator_id in form data.')
-      return new NextResponse('Missing creator_id', { status: 400 })
+  try {
+    const url = new URL('https://open.tiktokapis.com/v2/user/info/');
+    url.searchParams.set('fields', 'open_id,display_name,follower_count');
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.error?.code) {
+      console.error('TikTok API Error:', data.error);
+      return NextResponse.json({ message: `TikTok API Error: ${data.error.message}` }, { status: response.status });
     }
 
-    console.log(`🎯 Sending invitation to creator ${creator_id}`)
+    return NextResponse.json({ user: data.data.user });
 
-    await axios.post(
-      'https://open.tiktokapis.com/v2/open_api/cm/v2/invitation/create/',
-      {
-        creator_id,
-        campaign_name: 'Nudge Demo Campaign',
-        description: 'We’d love to collaborate with you on a branded content project.',
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
-
-    console.log('✅ Invite sent successfully!')
-    return NextResponse.redirect('/dashboard')
   } catch (error) {
-    console.error('❌ Error sending invite:', error)
-    return new NextResponse('Failed to send invite', { status: 500 })
+    console.error('Internal Server Error fetching creator data:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
