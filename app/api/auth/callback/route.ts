@@ -1,22 +1,15 @@
-// app/api/auth/callback/route.ts
-import { NextRequest, NextResponse } from 'next/server'
+// app/api/auth/callback/route.ts (Temporary Debugging Code)
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
-  const state = searchParams.get('state'); // It's good practice to check the state
-
-  // Validate state to prevent CSRF
-  if (state !== 'nudge') {
-    return new NextResponse('Invalid state parameter', { status: 400 });
-  }
 
   if (!code) {
-    return new NextResponse('Missing authorization code', { status: 400 });
+    return new NextResponse('Error: Missing authorization code from TikTok', { status: 400 });
   }
 
   try {
-    // We use URLSearchParams to ensure the body is x-www-form-urlencoded
     const body = new URLSearchParams({
       client_key: process.env.TIKTOK_CLIENT_KEY!,
       client_secret: process.env.TIKTOK_CLIENT_SECRET!,
@@ -25,43 +18,71 @@ export async function GET(req: NextRequest) {
       redirect_uri: process.env.TIKTOK_REDIRECT_URI!,
     });
 
-    const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+    const tokenResponse = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body,
     });
 
-    const data = await response.json();
+    const tokenData = await tokenResponse.json();
 
-    if (!response.ok) {
-      // Log the error for debugging and return a user-friendly message
-      console.error('TikTok token exchange failed:', data);
-      return new NextResponse(`Error from TikTok: ${data.error.message || 'Unknown Error'}`, { status: 500 });
+    if (!tokenResponse.ok) {
+      console.error('TikTok token exchange failed:', tokenData);
+      return new NextResponse(`<h1>Error from TikTok</h1><pre>${JSON.stringify(tokenData.error, null, 2)}</pre>`, {
+        status: 500,
+        headers: { 'Content-Type': 'text/html' },
+      });
     }
 
-    const accessToken = data.data.access_token;
-    const expiresIn = data.data.expires_in; // Use the dynamic expiration time
+    const accessToken = tokenData.data.access_token;
+    const expiresIn = tokenData.data.expires_in;
 
-    // Redirect to the dashboard
-    const redirectUrl = new URL('/dashboard', req.url);
-    const res = NextResponse.redirect(redirectUrl);
+    // Instead of a redirect, we return an HTML page
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Authenticated!</title>
+          <script>
+            // This script will run in the browser
+            window.location.href = '/dashboard';
+          </script>
+        </head>
+        <body>
+          <h1>Authentication Successful!</h1>
+          <p>You should be redirected to the dashboard shortly.</p>
+          <p>If you are not redirected, <a href="/dashboard">click here</a>.</p>
+        </body>
+      </html>
+    `;
 
-    // Set the secure cookie
-    res.cookies.set('access_token', accessToken, {
+    // Create the response with the HTML
+    const response = new NextResponse(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    });
+    
+    // Set the cookie on this response
+    response.cookies.set('access_token', accessToken, {
       httpOnly: true,
       path: '/',
-      maxAge: expiresIn, // Use the value from the API
-      secure: process.env.NODE_ENV === 'production', // Only set secure in production
-      sameSite: 'lax', // CSRF protection
+      maxAge: expiresIn,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
     });
 
-    return res;
+    return response;
 
   } catch (error) {
-    console.error('Internal server error:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Internal server error in callback:', error);
+    let errorMessage = 'Unknown error';
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+    return new NextResponse(`<h1>Internal Server Error</h1><p>${errorMessage}</p>`, { 
+        status: 500,
+        headers: { 'Content-Type': 'text/html' }
+    });
   }
 }
 
