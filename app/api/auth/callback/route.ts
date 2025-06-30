@@ -1,4 +1,4 @@
-// app/api/auth/callback/route.ts (Temporary Debugging Code)
+// app/api/auth/callback/route.ts (Final Production Code)
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -6,7 +6,10 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code');
 
   if (!code) {
-    return new NextResponse('Error: Missing authorization code from TikTok', { status: 400 });
+    // In production, it's better to redirect with an error param
+    const errorUrl = new URL('/login', req.url);
+    errorUrl.searchParams.set('error', 'Missing authorization code from TikTok');
+    return NextResponse.redirect(errorUrl);
   }
 
   try {
@@ -28,41 +31,17 @@ export async function GET(req: NextRequest) {
 
     if (!tokenResponse.ok) {
       console.error('TikTok token exchange failed:', tokenData);
-      return new NextResponse(`<h1>Error from TikTok</h1><pre>${JSON.stringify(tokenData.error, null, 2)}</pre>`, {
-        status: 500,
-        headers: { 'Content-Type': 'text/html' },
-      });
+      const errorUrl = new URL('/login', req.url);
+      errorUrl.searchParams.set('error', 'Failed to get token from TikTok.');
+      return NextResponse.redirect(errorUrl);
     }
 
     const accessToken = tokenData.data.access_token;
     const expiresIn = tokenData.data.expires_in;
 
-    // Instead of a redirect, we return an HTML page
-    const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Authenticated!</title>
-          <script>
-            // This script will run in the browser
-            window.location.href = '/dashboard';
-          </script>
-        </head>
-        <body>
-          <h1>Authentication Successful!</h1>
-          <p>You should be redirected to the dashboard shortly.</p>
-          <p>If you are not redirected, <a href="/dashboard">click here</a>.</p>
-        </body>
-      </html>
-    `;
-
-    // Create the response with the HTML
-    const response = new NextResponse(html, {
-      status: 200,
-      headers: { 'Content-Type': 'text/html' },
-    });
+    const redirectUrl = new URL('/dashboard', req.url);
+    const response = NextResponse.redirect(redirectUrl);
     
-    // Set the cookie on this response
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
       path: '/',
@@ -75,14 +54,9 @@ export async function GET(req: NextRequest) {
 
   } catch (error) {
     console.error('Internal server error in callback:', error);
-    let errorMessage = 'Unknown error';
-    if (error instanceof Error) {
-        errorMessage = error.message;
-    }
-    return new NextResponse(`<h1>Internal Server Error</h1><p>${errorMessage}</p>`, { 
-        status: 500,
-        headers: { 'Content-Type': 'text/html' }
-    });
+    const errorUrl = new URL('/login', req.url);
+    errorUrl.searchParams.set('error', 'An internal server error occurred.');
+    return NextResponse.redirect(errorUrl);
   }
 }
 
