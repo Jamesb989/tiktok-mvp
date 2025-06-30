@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 
 type Creator = {
-  // Assuming the creator ID from TikTok is a string
   id: string
   nickname: string
   follower_count: number
@@ -24,8 +23,6 @@ export default function Dashboard() {
         return res.json();
       })
       .then(data => {
-        // The /v2/user/info/ endpoint returns a single user object, not an array.
-        // We'll wrap it in an array to fit the list structure.
         if (data && data.user) {
             const creatorData = {
                 id: data.user.open_id,
@@ -34,7 +31,6 @@ export default function Dashboard() {
             };
             setCreators([creatorData]);
         } else {
-          // Handle cases where API returns unexpected format or no user
            throw new Error('Unexpected data format from API.');
         }
       })
@@ -47,8 +43,6 @@ export default function Dashboard() {
       });
   }, [])
   
-  // Note: This is an improved, asynchronous version of the form submission.
-  // The original <form> approach still works, but this provides a better UX.
   const handleInvite = async (creatorId: string) => {
     setInviteStatus(prev => ({ ...prev, [creatorId]: 'Sending...' }));
 
@@ -68,11 +62,14 @@ export default function Dashboard() {
         }
 
         setInviteStatus(prev => ({ ...prev, [creatorId]: 'Invite Sent!' }));
-    } catch (error: any) {
-        setInviteStatus(prev => ({ ...prev, [creatorId]: `Error: ${error.message}` }));
+    } catch (error) { // CORRECTED: No longer using 'any'
+        let errorMessage = 'An unknown error occurred.';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+        setInviteStatus(prev => ({ ...prev, [creatorId]: `Error: ${errorMessage}` }));
     }
   };
-
 
   return (
     <main className="max-w-2xl mx-auto p-10">
@@ -80,7 +77,6 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold">Creator Dashboard</h1>
         <a href="/api/auth/logout" className="text-sm text-gray-500 hover:underline">Logout</a>
       </div>
-
 
       {loading && <p>Loading creator data...</p>}
       
@@ -98,7 +94,7 @@ export default function Dashboard() {
           <div className="mt-4">
             <button 
                 onClick={() => handleInvite(c.id)}
-                disabled={!!inviteStatus[c.id] && inviteStatus[c.id] !== 'Error'}
+                disabled={!!inviteStatus[c.id] && !inviteStatus[c.id].startsWith('Error')}
                 className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition disabled:bg-gray-400 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {inviteStatus[c.id] || 'Send Campaign Invite'}
